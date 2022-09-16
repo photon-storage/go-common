@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/photon-storage/go-photon/sak/encoding/ssz"
+	"github.com/photon-storage/go-common/encoding/ssz"
 )
 
 type TestingTB interface {

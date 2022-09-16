@@ -13,8 +13,7 @@ import (
 	pbc "github.com/photon-storage/photon-proto/consensus"
 	pbtest "github.com/photon-storage/photon-proto/util"
 
-	"github.com/photon-storage/go-photon/testing/mock"
-	"github.com/photon-storage/go-photon/testing/require"
+	"github.com/photon-storage/go-common/testing/require"
 )
 
 func Test_Equal(t *testing.T) {
@@ -452,14 +451,12 @@ func TestAssert_DeepSSZEqual(t *testing.T) {
 			name: "equal structs",
 			args: args{
 				tb: &tbMock{},
-				expected: mock.Checkpoint(t).
-					SetEpoch(5).
-					SetRoot(mock.Hash(t, "hi there")).
-					Mock(),
-				actual: mock.Checkpoint(t).
-					SetEpoch(5).
-					SetRoot(mock.Hash(t, "hi there")).
-					Mock(),
+				expected: &pbc.Checkpoint{
+					Epoch: 5,
+				},
+				actual: &pbc.Checkpoint{
+					Epoch: 5,
+				},
 			},
 			expectedResult: true,
 		},
@@ -523,14 +520,12 @@ func TestAssert_DeepNotSSZEqual(t *testing.T) {
 			name: "not equal structs",
 			args: args{
 				tb: &tbMock{},
-				expected: mock.Checkpoint(t).
-					SetEpoch(5).
-					SetRoot(mock.Hash(t, "hello there")).
-					Mock(),
-				actual: mock.Checkpoint(t).
-					SetEpoch(5).
-					SetRoot(mock.Hash(t, "hi there")).
-					Mock(),
+				expected: &pbc.Checkpoint{
+					Epoch: 4,
+				},
+				actual: &pbc.Checkpoint{
+					Epoch: 5,
+				},
 			},
 			expectedResult: true,
 		},
