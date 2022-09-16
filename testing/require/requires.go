@@ -294,7 +294,50 @@ func isDeepEqual(expected, actual interface{}) bool {
 	if isProto {
 		return proto.Equal(expected.(proto.Message), actual.(proto.Message))
 	}
+
+	if isSliceProto(expected) && isSliceProto(actual) {
+		return protoSliceEqual(expected, actual)
+	}
+
 	return reflect.DeepEqual(expected, actual)
+}
+
+func isSliceProto(value interface{}) bool {
+	sliceValue := reflect.ValueOf(value)
+	if sliceValue.Kind() != reflect.Slice {
+		return false
+	}
+
+	if sliceValue.Len() > 0 {
+		_, isProto := sliceValue.Index(0).Interface().(proto.Message)
+		if isProto {
+			return true
+		}
+	}
+
+	return false
+}
+
+func protoSliceEqual(expected, actual interface{}) bool {
+	if isNil(expected) != isNil(actual) {
+		return false
+	}
+
+	expectedValue := reflect.ValueOf(expected)
+	actualValue := reflect.ValueOf(actual)
+	if expectedValue.Len() != actualValue.Len() {
+		return false
+	}
+
+	for i := 0; i < expectedValue.Len(); i++ {
+		expectedMessage := expectedValue.Index(i).Interface().(proto.Message)
+		actualMessage := actualValue.Index(i).Interface().(proto.Message)
+		if !proto.Equal(expectedMessage, actualMessage) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // isNil checks that underlying value of obj is nil.
