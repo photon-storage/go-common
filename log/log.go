@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"io"
+	"os"
 
 	joonix "github.com/joonix/log"
 	"github.com/sirupsen/logrus"
@@ -13,6 +14,13 @@ var (
 	logger *logrus.Logger
 	le     *logrus.Entry
 )
+
+type logSettings struct {
+	format    Format
+	formatter *logrus.TextFormatter
+}
+
+var settings *logSettings
 
 // Default initializer
 func init() {
@@ -28,12 +36,17 @@ func Init(logLevel Level, format Format) error {
 	logger = logrus.New()
 	logger.SetLevel(logrus.Level(logLevel))
 
+	settings = &logSettings{
+		format: format,
+	}
+
 	switch format {
 	case TextFormat:
 		formatter := new(logrus.TextFormatter)
 		formatter.TimestampFormat = "2006-01-02 15:04:05.000"
 		formatter.FullTimestamp = true
 		logger.SetFormatter(formatter)
+		settings.formatter = formatter
 	case FluentdFormat:
 		f := joonix.NewFormatter()
 		if err := joonix.DisableTimestampFormat(f); err != nil {
@@ -45,7 +58,22 @@ func Init(logLevel Level, format Format) error {
 	}
 
 	le = logger.WithFields(logrus.Fields{})
+	logger.SetOutput(os.Stdout)
 	return nil
+}
+
+func ForceColor() {
+	if settings == nil {
+		return
+	}
+	switch settings.format {
+	case TextFormat:
+		settings.formatter.ForceColors = true
+		logger.SetFormatter(settings.formatter)
+	case FluentdFormat:
+	case JsonFormat:
+	case JournaldFormat:
+	}
 }
 
 func SetLevel(logLevel Level) {

@@ -11,9 +11,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pbc "github.com/photon-storage/photon-proto/consensus"
-	pbt "github.com/photon-storage/photon-proto/util"
+	pbtest "github.com/photon-storage/photon-proto/util"
 
-	"github.com/photon-storage/go-common/testing/require"
+	"github.com/photon-storage/go-photon/testing/mock"
+	"github.com/photon-storage/go-photon/testing/require"
 )
 
 func Test_Equal(t *testing.T) {
@@ -191,6 +192,70 @@ func TestAssert_DeepEqual(t *testing.T) {
 			expectedErr: "Values are not equal, want: struct { i int }{i:42}, got: struct { i int }{i:41}",
 		},
 		{
+			name: "equal values with proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{Foo: "foo"},
+				actual:   &pbtest.TestMessage{Foo: "foo"},
+			},
+		},
+		{
+			name: "equal values with empty proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{},
+				actual:   &pbtest.TestMessage{},
+			},
+		},
+		{
+			name: "not-equal values with proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{Foo: "foo"},
+				actual:   &pbtest.TestMessage{Foo: "foo-test"},
+				msgs:     []interface{}{"Custom values are not equal"},
+			},
+			expectedErr: "Custom values are not equal",
+		},
+		{
+			name: "equal values with slice proto message",
+			args: args{
+				tb: &tbMock{},
+				expected: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+				actual: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+			},
+		},
+		{
+			name: "equal values with empty slice proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: []*pbtest.TestMessage{},
+				actual:   []*pbtest.TestMessage{},
+			},
+		},
+		{
+			name: "not-equal values with slice proto message",
+			args: args{
+				tb: &tbMock{},
+				expected: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+				actual: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo-test"},
+					&pbtest.TestMessage{Bar: "bar-test"},
+				},
+				msgs: []interface{}{"Custom values are not equal"},
+			},
+			expectedErr: "Custom values are not equal",
+		},
+		{
 			name: "custom error message",
 			args: args{
 				tb:       &tbMock{},
@@ -260,6 +325,70 @@ func TestAssert_DeepNotEqual(t *testing.T) {
 			},
 		},
 		{
+			name: "equal values with proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{Foo: "foo"},
+				actual:   &pbtest.TestMessage{Foo: "foo"},
+			},
+			expectedErr: "Values are equal",
+		},
+		{
+			name: "equal values with empty proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{},
+				actual:   &pbtest.TestMessage{},
+			},
+			expectedErr: "Values are equal",
+		},
+		{
+			name: "not-equal values with proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: &pbtest.TestMessage{Foo: "foo"},
+				actual:   &pbtest.TestMessage{Foo: "foo-test"},
+			},
+		},
+		{
+			name: "equal values with slice proto message",
+			args: args{
+				tb: &tbMock{},
+				expected: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+				actual: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+			},
+			expectedErr: "Values are equal",
+		},
+		{
+			name: "equal values with empty slice proto message",
+			args: args{
+				tb:       &tbMock{},
+				expected: []*pbtest.TestMessage{},
+				actual:   []*pbtest.TestMessage{},
+			},
+			expectedErr: "Values are equal",
+		},
+		{
+			name: "not-equal values with slice proto message",
+			args: args{
+				tb: &tbMock{},
+				expected: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo"},
+					&pbtest.TestMessage{Bar: "bar"},
+				},
+				actual: []*pbtest.TestMessage{
+					&pbtest.TestMessage{Foo: "foo-test"},
+					&pbtest.TestMessage{Bar: "bar-test"},
+				},
+			},
+		},
+		{
 			name: "custom error message",
 			args: args{
 				tb:       &tbMock{},
@@ -323,14 +452,14 @@ func TestAssert_DeepSSZEqual(t *testing.T) {
 			name: "equal structs",
 			args: args{
 				tb: &tbMock{},
-				expected: &pbc.Checkpoint{
-					Epoch: pbc.Epoch(5),
-					Root:  []byte("hi there"),
-				},
-				actual: &pbc.Checkpoint{
-					Epoch: pbc.Epoch(5),
-					Root:  []byte("hi there"),
-				},
+				expected: mock.Checkpoint(t).
+					SetEpoch(5).
+					SetRoot(mock.Hash(t, "hi there")).
+					Mock(),
+				actual: mock.Checkpoint(t).
+					SetEpoch(5).
+					SetRoot(mock.Hash(t, "hi there")).
+					Mock(),
 			},
 			expectedResult: true,
 		},
@@ -394,14 +523,14 @@ func TestAssert_DeepNotSSZEqual(t *testing.T) {
 			name: "not equal structs",
 			args: args{
 				tb: &tbMock{},
-				expected: &pbc.Checkpoint{
-					Epoch: pbc.Epoch(5),
-					Root:  []byte("hello there"),
-				},
-				actual: &pbc.Checkpoint{
-					Epoch: pbc.Epoch(5),
-					Root:  []byte("hi there"),
-				},
+				expected: mock.Checkpoint(t).
+					SetEpoch(5).
+					SetRoot(mock.Hash(t, "hello there")).
+					Mock(),
+				actual: mock.Checkpoint(t).
+					SetEpoch(5).
+					SetRoot(mock.Hash(t, "hi there")).
+					Mock(),
 			},
 			expectedResult: true,
 		},
@@ -870,7 +999,7 @@ func TestAssert_NotEmpty(t *testing.T) {
 			name: "simple populated protobuf",
 			args: args{
 				tb: &tbMock{},
-				input: &pbt.Puzzle{
+				input: &pbtest.Puzzle{
 					Challenge: "what do you get when protobufs have internal fields?",
 					Answer:    "Complicated reflect logic!",
 				},
@@ -879,7 +1008,7 @@ func TestAssert_NotEmpty(t *testing.T) {
 			name: "simple partially empty protobuf",
 			args: args{
 				tb: &tbMock{},
-				input: &pbt.Puzzle{
+				input: &pbtest.Puzzle{
 					Challenge: "what do you get when protobufs have internal fields?",
 				},
 			},
@@ -888,16 +1017,16 @@ func TestAssert_NotEmpty(t *testing.T) {
 			name: "complex populated protobuf",
 			args: args{
 				tb: &tbMock{},
-				input: &pbt.AddressBook{
-					People: []*pbt.Person{
+				input: &pbtest.AddressBook{
+					People: []*pbtest.Person{
 						{
 							Name:  "Foo",
 							Id:    42,
 							Email: "foo@bar.com",
-							Phones: []*pbt.Person_PhoneNumber{
+							Phones: []*pbtest.Person_PhoneNumber{
 								{
 									Number: "+1 111-111-1111",
-									Type:   pbt.Person_WORK, // Note: zero'th enum value will count as empty.
+									Type:   pbtest.Person_WORK, // Note: zero'th enum value will count as empty.
 								},
 							},
 							LastUpdated: timestamppb.Now(),
@@ -909,13 +1038,13 @@ func TestAssert_NotEmpty(t *testing.T) {
 			name: "complex partially empty protobuf with empty slices",
 			args: args{
 				tb: &tbMock{},
-				input: &pbt.AddressBook{
-					People: []*pbt.Person{
+				input: &pbtest.AddressBook{
+					People: []*pbtest.Person{
 						{
 							Name:        "Foo",
 							Id:          42,
 							Email:       "foo@bar.com",
-							Phones:      []*pbt.Person_PhoneNumber{},
+							Phones:      []*pbtest.Person_PhoneNumber{},
 							LastUpdated: timestamppb.Now(),
 						},
 					},
@@ -926,16 +1055,16 @@ func TestAssert_NotEmpty(t *testing.T) {
 			name: "complex partially empty protobuf with empty string",
 			args: args{
 				tb: &tbMock{},
-				input: &pbt.AddressBook{
-					People: []*pbt.Person{
+				input: &pbtest.AddressBook{
+					People: []*pbtest.Person{
 						{
 							Name:  "Foo",
 							Id:    42,
 							Email: "",
-							Phones: []*pbt.Person_PhoneNumber{
+							Phones: []*pbtest.Person_PhoneNumber{
 								{
 									Number: "+1 111-111-1111",
-									Type:   pbt.Person_WORK, // Note: zero'th enum value will count as empty.
+									Type:   pbtest.Person_WORK, // Note: zero'th enum value will count as empty.
 								},
 							},
 							LastUpdated: timestamppb.Now(),
