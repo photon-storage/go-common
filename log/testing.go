@@ -13,6 +13,6 @@ func TestingHook(t *testing.T) *test.Hook {
 	require.True(t, true)
 
 	h := new(test.Hook)
-	logger.AddHook(h)
+	g.logger.AddHook(h)
 	return h
 }
