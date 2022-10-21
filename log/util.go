@@ -17,9 +17,9 @@ func ConfigurePersistentLogging(fn string, isMux bool) error {
 	}
 
 	if isMux {
-		logger.SetOutput(io.MultiWriter(logger.Out, f))
+		g.logger.SetOutput(io.MultiWriter(g.logger.Out, f))
 	} else {
-		logger.SetOutput(f)
+		g.logger.SetOutput(f)
 	}
 
 	Info("File logging initialized")

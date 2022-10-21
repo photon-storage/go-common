@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,33 +11,61 @@ import (
 )
 
 // The global logger
-var (
-	logger *logrus.Logger
-	le     *logrus.Entry
-)
+var g *log
 
-type logSettings struct {
+type settings struct {
 	format    Format
 	formatter *logrus.TextFormatter
 }
 
-var settings *logSettings
+type log struct {
+	ctx      context.Context
+	cancel   context.CancelFunc
+	logger   *logrus.Logger
+	entry    *logrus.Entry
+	settings *settings
+	ch       chan func()
+}
+
+func (l *log) loop() {
+	for {
+		select {
+		case f := <-l.ch:
+			f()
+
+		case <-l.ctx.Done():
+			return
+		}
+	}
+}
+
+func (l *log) stop() {
+	l.cancel()
+}
 
 // Default initializer
 func init() {
-	logger = logrus.New()
+	logger := logrus.New()
 	logger.SetLevel(logrus.Level(InfoLevel))
 	logger.SetOutput(io.Discard)
-	le = logger.WithFields(logrus.Fields{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	g = &log{
+		ctx:    ctx,
+		cancel: cancel,
+		logger: logger,
+		entry:  logger.WithFields(logrus.Fields{}),
+		ch:     make(chan func(), 64),
+	}
+	go g.loop()
 }
 
 // Initialize the Logger
 func Init(logLevel Level, format Format) error {
 	// Create new logger
-	logger = logrus.New()
+	logger := logrus.New()
 	logger.SetLevel(logrus.Level(logLevel))
-
-	settings = &logSettings{
+	settings := &settings{
 		format: format,
 	}
 
@@ -57,19 +86,33 @@ func Init(logLevel Level, format Format) error {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
 
-	le = logger.WithFields(logrus.Fields{})
 	logger.SetOutput(os.Stdout)
+
+	if g != nil {
+		g.stop()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	g = &log{
+		ctx:      ctx,
+		cancel:   cancel,
+		logger:   logger,
+		entry:    logger.WithFields(logrus.Fields{}),
+		settings: settings,
+		ch:       make(chan func(), 64),
+	}
+	go g.loop()
+
 	return nil
 }
 
 func ForceColor() {
-	if settings == nil {
+	if g.settings == nil {
 		return
 	}
-	switch settings.format {
+	switch g.settings.format {
 	case TextFormat:
-		settings.formatter.ForceColors = true
-		logger.SetFormatter(settings.formatter)
+		g.settings.formatter.ForceColors = true
+		g.logger.SetFormatter(g.settings.formatter)
 	case FluentdFormat:
 	case JsonFormat:
 	case JournaldFormat:
@@ -77,11 +120,11 @@ func ForceColor() {
 }
 
 func SetLevel(logLevel Level) {
-	logger.SetLevel(logrus.Level(logLevel))
+	g.logger.SetLevel(logrus.Level(logLevel))
 }
 
 func GetLevel() Level {
-	return Level(logger.GetLevel())
+	return Level(g.logger.GetLevel())
 }
 
 func withFields(params ...interface{}) *logrus.Entry {
@@ -95,77 +138,89 @@ func withFields(params ...interface{}) *logrus.Entry {
 		fields[key] = params[i+1]
 	}
 
-	return le.WithFields(fields)
+	return g.entry.WithFields(fields)
 }
 
 func Trace(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.TraceLevel) {
+	if !g.logger.IsLevelEnabled(logrus.TraceLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Trace(v)
-	} else {
-		le.Trace(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Trace(v)
+		} else {
+			g.entry.Trace(v)
+		}
 	}
 }
 
 func Debug(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.DebugLevel) {
+	if !g.logger.IsLevelEnabled(logrus.DebugLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Debug(v)
-	} else {
-		le.Debug(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Debug(v)
+		} else {
+			g.entry.Debug(v)
+		}
 	}
 }
 
 func Info(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.InfoLevel) {
+	if !g.logger.IsLevelEnabled(logrus.InfoLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Info(v)
-	} else {
-		le.Info(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Info(v)
+		} else {
+			g.entry.Info(v)
+		}
 	}
 }
 
 func Warn(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.WarnLevel) {
+	if !g.logger.IsLevelEnabled(logrus.WarnLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Warn(v)
-	} else {
-		le.Warn(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Warn(v)
+		} else {
+			g.entry.Warn(v)
+		}
 	}
 }
 
 func Error(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.ErrorLevel) {
+	if !g.logger.IsLevelEnabled(logrus.ErrorLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Error(v)
-	} else {
-		le.Error(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Error(v)
+		} else {
+			g.entry.Error(v)
+		}
 	}
 }
 
 func Fatal(v string, params ...interface{}) {
-	if !logger.IsLevelEnabled(logrus.FatalLevel) {
+	if !g.logger.IsLevelEnabled(logrus.FatalLevel) {
 		return
 	}
 
-	if len(params) > 1 {
-		withFields(params...).Fatal(v)
-	} else {
-		le.Fatal(v)
+	g.ch <- func() {
+		if len(params) > 1 {
+			withFields(params...).Fatal(v)
+		} else {
+			g.entry.Fatal(v)
+		}
 	}
 }
