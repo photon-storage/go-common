@@ -27,14 +27,24 @@ type log struct {
 	ch       chan func()
 }
 
-func (l *log) loop() {
-	for {
-		select {
-		case f := <-l.ch:
-			f()
+func (l *log) log(f func()) {
+	if l.ch == nil {
+		f()
+	} else {
+		l.ch <- f
+	}
+}
 
-		case <-l.ctx.Done():
-			return
+func (l *log) loop() {
+	if l.ch != nil {
+		for {
+			select {
+			case f := <-l.ch:
+				f()
+
+			case <-l.ctx.Done():
+				return
+			}
 		}
 	}
 }
@@ -55,13 +65,11 @@ func init() {
 		cancel: cancel,
 		logger: logger,
 		entry:  logger.WithFields(logrus.Fields{}),
-		ch:     make(chan func(), 64),
 	}
-	go g.loop()
 }
 
 // Initialize the Logger
-func Init(logLevel Level, format Format) error {
+func Init(logLevel Level, format Format, sync bool) error {
 	// Create new logger
 	logger := logrus.New()
 	logger.SetLevel(logrus.Level(logLevel))
@@ -98,9 +106,12 @@ func Init(logLevel Level, format Format) error {
 		logger:   logger,
 		entry:    logger.WithFields(logrus.Fields{}),
 		settings: settings,
-		ch:       make(chan func(), 64),
 	}
-	go g.loop()
+
+	if !sync {
+		g.ch = make(chan func(), 64)
+		go g.loop()
+	}
 
 	return nil
 }
@@ -146,13 +157,13 @@ func Trace(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Trace(v)
 		} else {
 			g.entry.Trace(v)
 		}
-	}
+	})
 }
 
 func Debug(v string, params ...interface{}) {
@@ -160,13 +171,13 @@ func Debug(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Debug(v)
 		} else {
 			g.entry.Debug(v)
 		}
-	}
+	})
 }
 
 func Info(v string, params ...interface{}) {
@@ -174,13 +185,13 @@ func Info(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Info(v)
 		} else {
 			g.entry.Info(v)
 		}
-	}
+	})
 }
 
 func Warn(v string, params ...interface{}) {
@@ -188,13 +199,13 @@ func Warn(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Warn(v)
 		} else {
 			g.entry.Warn(v)
 		}
-	}
+	})
 }
 
 func Error(v string, params ...interface{}) {
@@ -202,13 +213,13 @@ func Error(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Error(v)
 		} else {
 			g.entry.Error(v)
 		}
-	}
+	})
 }
 
 func Fatal(v string, params ...interface{}) {
@@ -216,11 +227,11 @@ func Fatal(v string, params ...interface{}) {
 		return
 	}
 
-	g.ch <- func() {
+	g.log(func() {
 		if len(params) > 1 {
 			withFields(params...).Fatal(v)
 		} else {
 			g.entry.Fatal(v)
 		}
-	}
+	})
 }
