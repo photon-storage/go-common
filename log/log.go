@@ -149,7 +149,7 @@ func withFields(params ...interface{}) *logrus.Entry {
 		fields[key] = params[i+1]
 	}
 
-	return g.entry.WithFields(fields)
+	return g.logger.WithFields(fields)
 }
 
 func Trace(v string, params ...interface{}) {
