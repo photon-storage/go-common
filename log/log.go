@@ -13,6 +13,8 @@ import (
 // The global logger
 var g *log
 
+const chSize int = 64
+
 type settings struct {
 	format    Format
 	formatter *logrus.TextFormatter
@@ -43,9 +45,19 @@ func (l *log) loop() {
 				f()
 
 			case <-l.ctx.Done():
+				// Drain remaining logs in the channel.
+				for i := 0; i < chSize; i++ {
+					select {
+					case f := <-l.ch:
+						f()
+					default:
+						return
+					}
+				}
 				return
 			}
 		}
+
 	}
 }
 
@@ -109,7 +121,7 @@ func Init(logLevel Level, format Format, sync bool) error {
 	}
 
 	if !sync {
-		g.ch = make(chan func(), 64)
+		g.ch = make(chan func(), chSize)
 		go g.loop()
 	}
 
