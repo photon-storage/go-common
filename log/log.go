@@ -46,7 +46,7 @@ func (l *log) loop() {
 
 			case <-l.ctx.Done():
 				// Drain remaining logs in the channel.
-				for i := 0; i < chSize; i++ {
+				for {
 					select {
 					case f := <-l.ch:
 						f()
@@ -54,10 +54,8 @@ func (l *log) loop() {
 						return
 					}
 				}
-				return
 			}
 		}
-
 	}
 }
 
