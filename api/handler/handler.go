@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"reflect"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/photon-storage/go-common/api/pagination"
 	"github.com/photon-storage/go-common/log"
 )
+
+const reqBodyLabel = "request_body_label"
 
 var (
 	errorType        = reflect.TypeOf((*error)(nil)).Elem()
@@ -88,6 +91,12 @@ func buildInputParams(ft reflect.Type, ctx *gin.Context) ([]any, error) {
 			return nil, err
 		}
 
+		reqBytes, err := json.Marshal(reqArg)
+		if err != nil {
+			return nil, err
+		}
+
+		ctx.Set(reqBodyLabel, string(reqBytes))
 		if err := validator.New().Struct(reqArg); err != nil {
 			return nil, err
 		}
@@ -162,6 +171,11 @@ func validateFunc(fn handleFunc) error {
 }
 
 func (h *Handler) errResponse(c *gin.Context, err error) {
+	log.Error("Error requesting the api server",
+		"url", c.Request.URL,
+		"request_body", c.Value(reqBodyLabel),
+		"error", err,
+	)
 	code := getErrCode(err, h.errCodes)
 	msg := err.Error()
 	if code == -1 {
