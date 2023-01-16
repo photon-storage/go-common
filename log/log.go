@@ -176,6 +176,10 @@ func Trace(v string, params ...interface{}) {
 	})
 }
 
+func IsDebug() bool {
+	return g.logger.IsLevelEnabled(logrus.DebugLevel)
+}
+
 func Debug(v string, params ...interface{}) {
 	if !g.logger.IsLevelEnabled(logrus.DebugLevel) {
 		return
