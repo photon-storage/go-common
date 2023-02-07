@@ -28,12 +28,19 @@ type Response struct {
 	Data any    `json:"data,omitempty"`
 }
 
+// Middleware executes the pending handlers in the chain inside the calling handler.
+type Middleware func(ctx *gin.Context) error
+
 type Handler struct {
-	errCodes map[error]int
+	errCodes    map[error]int
+	middlewares []Middleware
 }
 
-func New(errCodes map[error]int) *Handler {
-	return &Handler{errCodes: errCodes}
+func New(errCodes map[error]int, middlewares ...Middleware) *Handler {
+	return &Handler{
+		errCodes:    errCodes,
+		middlewares: middlewares,
+	}
 }
 
 type handleFunc any
@@ -46,6 +53,13 @@ func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
 	}
 
 	return func(ctx *gin.Context) {
+		for _, middleware := range h.middlewares {
+			if err := middleware(ctx); err != nil {
+				h.errResponse(ctx, err)
+				return
+			}
+		}
+
 		ft := reflect.TypeOf(fn)
 		args, err := buildInputParams(ft, ctx)
 		if err != nil {
