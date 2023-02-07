@@ -28,24 +28,17 @@ type Response struct {
 	Data any    `json:"data,omitempty"`
 }
 
-// Middleware executes the pending handlers in the chain inside the calling handler.
-type Middleware func(ctx *gin.Context) error
-
 type Handler struct {
-	errCodes    map[error]int
-	middlewares []Middleware
+	errCodes map[error]int
 }
 
-func New(errCodes map[error]int, middlewares ...Middleware) *Handler {
-	return &Handler{
-		errCodes:    errCodes,
-		middlewares: middlewares,
-	}
+func New(errCodes map[error]int) *Handler {
+	return &Handler{errCodes: errCodes}
 }
 
 type handleFunc any
 
-func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
+func (h *Handler) Handle(fn handleFunc, abort bool) gin.HandlerFunc {
 	if err := validateFunc(fn); err != nil {
 		log.Fatal("validate service handle func failed",
 			"error", err,
@@ -53,13 +46,6 @@ func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
 	}
 
 	return func(ctx *gin.Context) {
-		for _, middleware := range h.middlewares {
-			if err := middleware(ctx); err != nil {
-				h.errResponse(ctx, err)
-				return
-			}
-		}
-
 		ft := reflect.TypeOf(fn)
 		args, err := buildInputParams(ft, ctx)
 		if err != nil {
@@ -70,6 +56,11 @@ func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
 		result := callHandleFunc(fn, args...)
 		if err := result[len(result)-1]; err != nil {
 			h.errResponse(ctx, err.(error))
+			return
+		}
+
+		if !abort {
+			ctx.Next()
 			return
 		}
 
@@ -100,7 +91,7 @@ func buildInputParams(ft reflect.Type, ctx *gin.Context) ([]any, error) {
 	}
 
 	if ft.In(1) != paginationType {
-		reqArg := reflect.New(ft.In(1)).Interface()
+		reqArg := reflect.New(ft.In(1).Elem()).Interface()
 		if err := ctx.ShouldBindJSON(reqArg); err != nil {
 			return nil, err
 		}
