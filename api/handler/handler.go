@@ -86,7 +86,7 @@ func buildInputParams(ft reflect.Type, ctx *gin.Context) ([]any, error) {
 	}
 
 	if ft.In(1) != paginationType {
-		reqArg := reflect.New(ft.In(1)).Interface()
+		reqArg := reflect.New(ft.In(1).Elem()).Interface()
 		if err := ctx.ShouldBindJSON(reqArg); err != nil {
 			return nil, err
 		}
