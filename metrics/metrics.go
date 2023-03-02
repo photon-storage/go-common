@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -43,14 +44,12 @@ func Init(ctx context.Context, namespace string, port int) {
 }
 
 // NewCounter declares a new counter.
-func NewCounter(
-	name string,
-	help string,
-) {
+func NewCounter(name string) {
+	metricName, labels := parseName(name)
 	counters[name] = promauto.NewCounter(prometheus.CounterOpts{
-		Namespace: metricNamespace,
-		Name:      name,
-		Help:      help,
+		Namespace:   metricNamespace,
+		Name:        metricName,
+		ConstLabels: labels,
 	})
 }
 
@@ -69,14 +68,12 @@ func CounterAdd(name string, v float64) {
 }
 
 // NewGauge declares a new gauge.
-func NewGauge(
-	name string,
-	help string,
-) {
+func NewGauge(name string) {
+	metricName, labels := parseName(name)
 	gauges[name] = promauto.NewGauge(prometheus.GaugeOpts{
-		Namespace: metricNamespace,
-		Name:      name,
-		Help:      help,
+		Namespace:   metricNamespace,
+		Name:        metricName,
+		ConstLabels: labels,
 	})
 }
 
@@ -114,20 +111,40 @@ func GaugeAdd(name string, v float64) {
 // to define the regular buckets here explicitly.)
 func NewHistogram(
 	name string,
-	help string,
 	buckets ...float64,
 ) {
 	histograms[name] = promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: metricNamespace,
 		Name:      name,
-		Help:      help,
 		Buckets:   buckets,
 	})
 }
 
-func HistAdd(name string, v float64) {
+type number interface {
+	int | int8 | uint8 | int16 | uint16 | int32 | uint32 | int64 | uint64 | float32 | float64
+}
+
+func HistAdd[T number](name string, v T) {
 	h := histograms[name]
 	if h != nil {
-		h.Observe(v)
+		h.Observe(float64(v))
 	}
+}
+
+func parseName(name string) (string, prometheus.Labels) {
+	parts := strings.Split(name, ".")
+	if len(parts) == 1 {
+		return parts[0], nil
+	}
+
+	labels := prometheus.Labels{}
+	for i := 1; i < len(parts); i++ {
+		kv := strings.Split(parts[i], "#")
+		if len(kv) != 2 {
+			continue
+		}
+		labels[kv[0]] = kv[1]
+	}
+
+	return parts[0], labels
 }
