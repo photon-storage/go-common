@@ -98,6 +98,13 @@ func GaugeAdd(name string, v float64) {
 	}
 }
 
+func GaugeSet(name string, v float64) {
+	g := gauges[name]
+	if g != nil {
+		g.Set(v)
+	}
+}
+
 // NewHistogram declares a new histogram.
 // Buckets defines the buckets into which observations are counted. Each
 // element in the slice is the upper inclusive bound of a bucket. The
