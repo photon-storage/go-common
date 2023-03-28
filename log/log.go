@@ -133,6 +133,22 @@ func ForceColor() {
 	switch g.settings.format {
 	case TextFormat:
 		g.settings.formatter.ForceColors = true
+		g.settings.formatter.DisableColors = false
+		g.logger.SetFormatter(g.settings.formatter)
+	case FluentdFormat:
+	case JsonFormat:
+	case JournaldFormat:
+	}
+}
+
+func DisableColor() {
+	if g.settings == nil {
+		return
+	}
+	switch g.settings.format {
+	case TextFormat:
+		g.settings.formatter.ForceColors = false
+		g.settings.formatter.DisableColors = true
 		g.logger.SetFormatter(g.settings.formatter)
 	case FluentdFormat:
 	case JsonFormat:
