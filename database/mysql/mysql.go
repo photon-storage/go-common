@@ -13,7 +13,7 @@ import (
 
 // NewMySQLDB creates the mysql master/slaves cluster.
 func NewMySQLDB(cfg Config) (*gorm.DB, error) {
-	dsnTemplate := "%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local"
+	dsnTemplate := "%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=UTC"
 	masterDSN := fmt.Sprintf(dsnTemplate,
 		cfg.Master.Username,
 		cfg.Master.Password,
