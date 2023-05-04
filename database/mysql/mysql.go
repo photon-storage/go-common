@@ -22,10 +22,21 @@ func NewMySQLDB(cfg Config) (*gorm.DB, error) {
 		cfg.Master.DBName,
 	)
 
-	db, err := gorm.Open(mysql.Open(masterDSN), &gorm.Config{
-		Logger:          logger.Default.LogMode(parseLoggerLevel(cfg.LogLevel)),
-		CreateBatchSize: 100,
-	})
+	utc, err := time.LoadLocation("UTC")
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := gorm.Open(
+		mysql.Open(masterDSN),
+		&gorm.Config{
+			Logger:          logger.Default.LogMode(parseLoggerLevel(cfg.LogLevel)),
+			CreateBatchSize: 100,
+			NowFunc: func() time.Time {
+				return time.Now().In(utc)
+			},
+		},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "open master mysql")
 	}
