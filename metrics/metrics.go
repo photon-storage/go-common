@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -141,6 +142,13 @@ func HistAdd[T number](name string, v T) {
 	h := histograms[name]
 	if h != nil {
 		h.Observe(float64(v))
+	}
+}
+
+func ElapsedMs(name string) func() {
+	start := time.Now()
+	return func() {
+		HistAdd(name, float64(time.Since(start)/time.Millisecond))
 	}
 }
 
