@@ -79,7 +79,11 @@ func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
 
 		ctx.AbortWithStatusJSON(
 			http.StatusOK,
-			Response{Code: http.StatusOK, Data: result[0]},
+			Response{
+				Code: http.StatusOK,
+				Msg:  "ok",
+				Data: result[0],
+			},
 		)
 	}
 }
