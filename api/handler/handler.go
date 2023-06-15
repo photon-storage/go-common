@@ -59,6 +59,11 @@ func (h *Handler) Handle(fn handleFunc) gin.HandlerFunc {
 			return
 		}
 
+		// If handle function has already sent response, we could just stop here.
+		if ctx.IsAborted() {
+			return
+		}
+
 		if ft.In(ft.NumIn()-1) == paginationType {
 			r := result[0].(*pagination.Result)
 			query := args[len(args)-1].(*pagination.Query)
