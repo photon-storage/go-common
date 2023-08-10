@@ -187,11 +187,7 @@ func (h *Handler) errResponse(c *gin.Context, err error) {
 	)
 	code := getErrCode(err, h.errCodes)
 	msg := err.Error()
-	if code == -1 {
-		msg = "request failed"
-	}
-
-	c.AbortWithStatusJSON(http.StatusOK, Response{
+	c.AbortWithStatusJSON(http.StatusBadRequest, Response{
 		Code: code,
 		Msg:  msg,
 	})
