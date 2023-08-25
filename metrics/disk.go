@@ -11,15 +11,15 @@ import (
 	"time"
 )
 
-type entry struct {
+type dfEntry struct {
 	fs    string
 	mount string
 	total int64
 	used  int64
 }
 
-func getDfResults(ctx context.Context) ([]*entry, error) {
-	var disks []*entry
+func getDfResults(ctx context.Context) ([]*dfEntry, error) {
+	var disks []*dfEntry
 	switch runtime.GOOS {
 	case "linux":
 		cmd := exec.Command(
@@ -57,7 +57,7 @@ func getDfResults(ctx context.Context) ([]*entry, error) {
 				return nil, err
 			}
 
-			disks = append(disks, &entry{
+			disks = append(disks, &dfEntry{
 				fs:    strings.TrimSpace(fields[0]),
 				mount: strings.TrimSpace(fields[1]),
 				total: totalBlks * 1024,
@@ -71,9 +71,7 @@ func getDfResults(ctx context.Context) ([]*entry, error) {
 	return disks, nil
 }
 
-var registeredDisks map[string]bool
-
-func label(e *entry) string {
+func dfLabel(e *dfEntry) string {
 	return fmt.Sprintf("fs#%v.mount#%v", e.fs, e.mount)
 }
 
@@ -83,20 +81,23 @@ func RegisterDiskMetrics(ctx context.Context) error {
 		return err
 	}
 
-	registeredDisks = map[string]bool{}
+	registeredDisks := map[string]bool{}
 	for _, d := range disks {
-		lbl := label(d)
+		lbl := dfLabel(d)
 		registeredDisks[lbl] = true
 		NewGauge("host_disk_total_bytes." + lbl)
 		NewGauge("host_disk_used_bytes." + lbl)
 	}
 
-	go diskMetricsUpdateLoop(ctx)
+	go diskMetricsUpdateLoop(ctx, registeredDisks)
 
 	return nil
 }
 
-func diskMetricsUpdateLoop(ctx context.Context) {
+func diskMetricsUpdateLoop(
+	ctx context.Context,
+	registeredDisks map[string]bool,
+) {
 	ticker := time.NewTicker(60 * time.Second)
 
 	for {
@@ -109,7 +110,7 @@ func diskMetricsUpdateLoop(ctx context.Context) {
 
 			reported := map[string]bool{}
 			for _, d := range disks {
-				lbl := label(d)
+				lbl := dfLabel(d)
 				if !registeredDisks[lbl] {
 					continue
 				}
