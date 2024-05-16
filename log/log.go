@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
-	joonix "github.com/joonix/log"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,18 +15,15 @@ var g *log
 
 const chSize int = 64
 
-type settings struct {
-	format    Format
-	formatter *logrus.TextFormatter
-}
-
 type log struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	logger   *logrus.Logger
-	entry    *logrus.Entry
-	settings *settings
-	ch       chan func()
+	ctx       context.Context
+	cancel    context.CancelFunc
+	logger    *logrus.Logger
+	entry     *logrus.Entry
+	opts      *Options
+	formatter *TimeZoneFormatter
+	ch        chan func()
+	doneCh    chan bool
 }
 
 func (l *log) log(f func()) {
@@ -39,6 +36,7 @@ func (l *log) log(f func()) {
 
 func (l *log) loop() {
 	if l.ch != nil {
+		defer close(l.doneCh)
 		for {
 			select {
 			case f := <-l.ch:
@@ -78,82 +76,62 @@ func init() {
 	}
 }
 
+type Options struct {
+	Context  context.Context
+	LogLevel Level
+	Sync     bool
+	Location *time.Location
+}
+
 // Initialize the Logger
-func Init(logLevel Level, format Format, sync bool) error {
-	// Create new logger
-	logger := logrus.New()
-	logger.SetLevel(logrus.Level(logLevel))
-	settings := &settings{
-		format: format,
-	}
-
-	switch format {
-	case TextFormat:
-		formatter := new(logrus.TextFormatter)
-		formatter.TimestampFormat = "2006-01-02 15:04:05.000"
-		formatter.FullTimestamp = true
-		logger.SetFormatter(formatter)
-		settings.formatter = formatter
-	case FluentdFormat:
-		f := joonix.NewFormatter()
-		if err := joonix.DisableTimestampFormat(f); err != nil {
-			return err
-		}
-		logger.SetFormatter(f)
-	case JsonFormat:
-		logrus.SetFormatter(&logrus.JSONFormatter{})
-	}
-
-	logger.SetOutput(os.Stdout)
-
+func Init(opts *Options) error {
 	if g != nil {
 		g.stop()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+
+	formatter := newTimeZoneFormatter(opts.Location)
+
+	// Create new logger
+	logger := logrus.New()
+	logger.SetLevel(logrus.Level(opts.LogLevel))
+	logger.SetFormatter(formatter)
+	logger.SetOutput(os.Stdout)
+
+	ctx, cancel := context.WithCancel(opts.Context)
 	g = &log{
-		ctx:      ctx,
-		cancel:   cancel,
-		logger:   logger,
-		entry:    logger.WithFields(logrus.Fields{}),
-		settings: settings,
+		ctx:       ctx,
+		cancel:    cancel,
+		logger:    logger,
+		entry:     logger.WithFields(logrus.Fields{}),
+		opts:      opts,
+		formatter: formatter,
 	}
 
-	if !sync {
+	if !opts.Sync {
 		g.ch = make(chan func(), chSize)
+		g.doneCh = make(chan bool)
 		go g.loop()
 	}
 
 	return nil
 }
 
-func ForceColor() {
-	if g.settings == nil {
-		return
-	}
-	switch g.settings.format {
-	case TextFormat:
-		g.settings.formatter.ForceColors = true
-		g.settings.formatter.DisableColors = false
-		g.logger.SetFormatter(g.settings.formatter)
-	case FluentdFormat:
-	case JsonFormat:
-	case JournaldFormat:
+func WaitForDone() {
+	if g.doneCh != nil {
+		<-g.doneCh
 	}
 }
 
+func ForceColor() {
+	g.formatter.formatter.ForceColors = true
+	g.formatter.formatter.DisableColors = false
+	g.logger.SetFormatter(g.formatter)
+}
+
 func DisableColor() {
-	if g.settings == nil {
-		return
-	}
-	switch g.settings.format {
-	case TextFormat:
-		g.settings.formatter.ForceColors = false
-		g.settings.formatter.DisableColors = true
-		g.logger.SetFormatter(g.settings.formatter)
-	case FluentdFormat:
-	case JsonFormat:
-	case JournaldFormat:
-	}
+	g.formatter.formatter.ForceColors = false
+	g.formatter.formatter.DisableColors = true
+	g.logger.SetFormatter(g.formatter)
 }
 
 func SetLevel(logLevel Level) {
