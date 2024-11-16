@@ -77,10 +77,11 @@ func init() {
 }
 
 type Options struct {
-	Context  context.Context
-	LogLevel Level
-	Sync     bool
-	Location *time.Location
+	Context    context.Context
+	LogLevel   Level
+	Sync       bool
+	ForceColor bool
+	Location   *time.Location
 }
 
 // Initialize the Logger
@@ -90,6 +91,10 @@ func Init(opts *Options) error {
 	}
 
 	formatter := newTimeZoneFormatter(opts.Location)
+	if opts.ForceColor {
+		formatter.formatter.ForceColors = true
+		formatter.formatter.DisableColors = false
+	}
 
 	// Create new logger
 	logger := logrus.New()
