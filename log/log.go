@@ -30,7 +30,11 @@ func (l *log) log(f func()) {
 	if l.ch == nil {
 		f()
 	} else {
-		l.ch <- f
+		select {
+		case l.ch <- f:
+		case <-g.doneCh:
+			// Ignore incoming and buffered logs after ctx is done.
+		}
 	}
 }
 
